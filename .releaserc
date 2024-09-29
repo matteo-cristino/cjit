@@ -1,5 +1,5 @@
 {
-  "repositoryUrl": "git@github.com:dyne/cjit.git",
+  "repositoryUrl": "git@github.com:matteo-cristino/cjit.git",
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
