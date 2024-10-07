@@ -109,11 +109,27 @@ static int rm_ftw(const char *pathname,
                   const struct stat *sbuf,
                   int type, struct FTW *ftwb) {
   _err("Info: remove path %s",pathname);
-  if(remove(pathname) < 0) {
-        _err("Error: remove path %s",pathname);
-        _err("%s",strerror(errno));
-        return -1;
+#ifndef LIBC_MINGW32
+   if(remove(pathname) < 0) {
+         _err("Error: remove path %s",pathname);
+         _err("%s",strerror(errno));
+         return -1;
+   }
+#else
+  if (type == FTW_F) {
+    if(DeleteFile(pathname) == 0) {
+      _err("Error: DeleteFile path %s",pathname);
+      _err("%s",strerror(errno));
+      return -1;
+    }
+  } else if (type == FTW_D) {
+    if(RemoveDirectory(pathname) == 0) {
+      _err("Error: RemoveDirectory path %s",pathname);
+      _err("%s",strerror(errno));
+      return -1;
+    }
   }
+#endif
   return 0;
 }
 bool rm_recursive(char *path) {
@@ -247,33 +263,5 @@ char *win32_mkdtemp() {
         return NULL;
     }
     return(tempDir);
-}
-void win32_rmdtemp(char *path) {
-    static char sysTempDir[MAX_PATH];
-    static char secTempDir[MAX_PATH];
-    static char winTempDir[MAX_PATH];
-    PathCombine(sysTempDir, path, "sys");
-    rm_recursive(sysTempDir);
-    if (RemoveDirectory(sysTempDir) == 0) {
-        _err("Failed to remove sys dir in temporary dir: %s",path);
-        return;
-    }
-    PathCombine(secTempDir, path, "sec_api");
-    rm_recursive(secTempDir);
-    if (RemoveDirectory(secTempDir) == 0) {
-        _err("Failed to remove sec_api dir in temporary dir: %s",path);
-        return;
-    }
-    PathCombine(winTempDir, path, "winapi");
-    rm_recursive(winTempDir);
-    if (RemoveDirectory(winTempDir) == 0) {
-        _err("Failed to remove winapi dir in temporary dir: %s",path);
-        return;
-    }
-    rm_recursive(path);
-    if (RemoveDirectory(path) == 0) {
-        _err("Failed to remove temporary dir: %s",path);
-        return;
-    }
 }
 #endif
