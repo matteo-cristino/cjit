@@ -37,25 +37,16 @@ void _out(const char *fmt, ...) {
 #if defined(__EMSCRIPTEN__)
   EM_ASM_({Module.print(UTF8ToString($0))}, msg);
 #else
-  write(STDOUT_FILENO, msg, len+1);
+  write(fileno(stdout), msg, len+1);
 #endif
 }
 
 // error message free from context
 void _err(const char *fmt, ...) {
-  char msg[MAX_STRING+4];
-  int len;
   va_list args;
   va_start(args, fmt);
-  len = vsnprintf(msg, MAX_STRING, fmt, args);
+  vfprintf(stderr, fmt, args);
   va_end(args);
-  msg[len] = '\n';
-  msg[len+1] = 0x0;
-#if defined(__EMSCRIPTEN__)
-  EM_ASM_({Module.printErr(UTF8ToString($0))}, msg);
-#elif defined(__ANDROID__)
-  __android_log_print(ANDROID_LOG_ERROR, "ZEN", "%s", msg);
-#else
-  write(STDERR_FILENO,msg,len+1);
-#endif
+  fprintf(stderr, "\n");
+  fflush(stderr);
 }

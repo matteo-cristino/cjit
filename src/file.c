@@ -32,8 +32,11 @@
 #include <rpc.h>
 #pragma comment(lib, "rpcrt4.lib")
 #pragma comment(lib, "shlwapi.lib")
+#else
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #endif
-
 extern void _err(const char *fmt, ...);
 
 // Function to get the length of a file in bytes
@@ -68,6 +71,8 @@ char* file_load(const char *filename) {
         return NULL;
     }
 
+    _err("Loading source file %s",filename);
+
     fread(contents, 1, length, file);
     contents[length] = '\0'; // Null-terminate the string
     fclose(file);
@@ -79,8 +84,12 @@ bool write_to_file(char *path, char *filename, char *buf, unsigned int len) {
   FILE *fd;
   size_t written;
   char fullpath[256];
+#if defined(LIBC_MINGW32)
+  snprintf(fullpath,255,"%s\\%s",path,filename);
+#else
   snprintf(fullpath,255,"%s/%s",path,filename);
-  fd = fopen(fullpath,"w");
+#endif
+  fd = fopen(fullpath,"wb");
   if(!fd) {
     _err("Error: fopen file %s",fullpath);
     _err("%s",strerror(errno));
@@ -99,11 +108,27 @@ bool write_to_file(char *path, char *filename, char *buf, unsigned int len) {
 static int rm_ftw(const char *pathname,
                   const struct stat *sbuf,
                   int type, struct FTW *ftwb) {
-  if(remove(pathname) < 0) {
-        _err("Error: remove path %s",pathname);
-        _err("%s",strerror(errno));
-        return -1;
+#ifndef LIBC_MINGW32
+   if(remove(pathname) < 0) {
+         _err("Error: remove path %s",pathname);
+         _err("%s",strerror(errno));
+         return -1;
+   }
+#else
+  if (type == FTW_F) {
+    if(DeleteFile(pathname) == 0) {
+      _err("Error: DeleteFile path %s",pathname);
+      _err("%s",strerror(errno));
+      return -1;
+    }
+  } else if (type == FTW_D) {
+    if(RemoveDirectory(pathname) == 0) {
+      _err("Error: RemoveDirectory path %s",pathname);
+      _err("%s",strerror(errno));
+      return -1;
+    }
   }
+#endif
   return 0;
 }
 bool rm_recursive(char *path) {
@@ -115,13 +140,87 @@ bool rm_recursive(char *path) {
   return true;
 }
 
+#ifndef LIBC_MINGW32
+
+static char *full_content = NULL;
+
+
+static int file_load_ftw(const char *pathname,
+                         const struct stat *sbuf,
+                         int type, struct FTW *ftwb) {
+    FILE *fd;
+    char *content = NULL;
+    if (type == FTW_F) {
+        size_t pathlen = strlen(pathname);
+        if (pathname[pathlen-1] == 'c' &&
+            pathname[pathlen-2] == '.') {
+            content = file_load(pathname);
+            if (content == NULL) {
+                _err("Error: file_load %s",pathname);
+                return -1;
+            }
+            if (full_content == NULL) {
+                full_content = content;
+            } else {
+                full_content = realloc(full_content, strlen(full_content) + strlen(content) + 1);
+                if (full_content == NULL) {
+                    _err("Error: realloc full_content");
+                    return -1;
+                }
+                strcat(full_content, content);
+            }
+        }
+    }
+    return 0;
+}
+
+/* dir_load: nftw version */
+char *dir_load(const char *path)
+{
+    struct stat sb;
+    FILE *fd;
+    char *content = NULL;
+
+    if (stat(path, &sb) != 0) {
+        _err("Error: %s",path);
+        _err("%s",strerror(errno));
+        return NULL;
+    }
+    if (!S_ISDIR(sb.st_mode)) {
+        _err("Error: %s is not a directory",path);
+        return NULL;
+    }
+    if (nftw(path, file_load_ftw, 10, FTW_DEPTH|FTW_MOUNT|FTW_PHYS) < 0) {
+        _err("Error: nftw path %s",path);
+        _err("%s",strerror(errno));
+        return NULL;
+    }
+    return full_content;
+}
+
+
+#else
+char *dir_load(const char *path)
+{
+    /* FIXME */
+    _err("Error: dir_load not implemented on Windows");
+    return NULL;
+}
+
+
+#endif
+
+
 #ifdef LIBC_MINGW32
 ///////////////
 // WINDOWS SHIT
 char *win32_mkdtemp() {
     static char tempDir[MAX_PATH];
+    static char sysTempDir[MAX_PATH];
+    static char secTempDir[MAX_PATH];
+    static char winTempDir[MAX_PATH];
     char tempPath[MAX_PATH];
-    char *filename = "CJIT-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+    char filename [] = "CJIT-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
     // Get the temporary path
     if (GetTempPath(MAX_PATH, tempPath) == 0) {
         _err("Failed to get temporary path");
@@ -145,6 +244,21 @@ char *win32_mkdtemp() {
     // Create the temporary directory
     if (CreateDirectory(tempDir, NULL) == 0) {
         _err("Failed to create temporary dir: %s",tempDir);
+        return NULL;
+    }
+    PathCombine(sysTempDir, tempDir, "sys");
+    if (CreateDirectory(sysTempDir, NULL) == 0) {
+        _err("Failed to create sys dir in temporary dir: %s",sysTempDir);
+        return NULL;
+    }
+    PathCombine(secTempDir, tempDir, "sec_api");
+    if (CreateDirectory(secTempDir, NULL) == 0) {
+        _err("Failed to create sec_api dir in temporary dir: %s",secTempDir);
+        return NULL;
+    }
+    PathCombine(winTempDir, tempDir, "winapi");
+    if (CreateDirectory(winTempDir, NULL) == 0) {
+        _err("Failed to create winapi dir in temporary dir: %s",winTempDir);
         return NULL;
     }
     return(tempDir);
