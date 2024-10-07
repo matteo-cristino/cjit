@@ -108,6 +108,7 @@ bool write_to_file(char *path, char *filename, char *buf, unsigned int len) {
 static int rm_ftw(const char *pathname,
                   const struct stat *sbuf,
                   int type, struct FTW *ftwb) {
+  _err("Info: remove path %s",pathname);
   if(remove(pathname) < 0) {
         _err("Error: remove path %s",pathname);
         _err("%s",strerror(errno));
