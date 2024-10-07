@@ -527,6 +527,8 @@ static int cjit_exec_win(TCCState *TCC, const char *ep, int argc, char **argv) {
     // Wait for the thread to finish execution
     WaitForSingleObject(thread, INFINITE);
 
+    fflush(stdout);
+
     // Get the exit code of the thread (which is the return value of the function)
     DWORD exitCode;
     if (!GetExitCodeThread(thread, &exitCode)) {
