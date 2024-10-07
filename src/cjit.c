@@ -28,6 +28,8 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/poll.h>
+#else
+#include <windows.h>
 #endif
 
 #include <cflag.h>
