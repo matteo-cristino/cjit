@@ -484,12 +484,59 @@ static int cjit_exec_win(TCCState *TCC, const char *ep, int argc, char **argv) {
   int (*_ep)(int, char**);
   _ep = tcc_get_symbol(TCC, ep);
   if (!_ep) {
-    _err("Symbol not found in source: %s","main");
+    _err("Symbol not found in source: %s", "main");
     return -1;
   }
   _err("Execution start\n---");
-  res = _ep(argc, argv);
-  return(res);
+
+  // Create a new process to run the function
+  STARTUPINFO si;
+  PROCESS_INFORMATION pi;
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
+
+  // Here, we assume that the entry point (_ep) is packaged in a form that can be executed via a separate process.
+  // If _ep is simply a function pointer, this won't work, as we cannot directly execute a function like this in Windows.
+
+  // You would likely need to implement a wrapper executable that dynamically loads your symbol
+  // and then passes the args (argc, argv) to it. Here's the skeleton of how to create and wait for a process.
+
+  // Note: For illustration only; you'll need an executable to run.
+  if (!CreateProcess(NULL,   // No module name (use command line)
+    ".\\cjit.exe", // Command line (you'll need a separate executable that knows how to call _ep)
+    NULL,           // Process handle not inheritable
+    NULL,           // Thread handle not inheritable
+    FALSE,          // Set handle inheritance to FALSE
+    0,              // No creation flags
+    NULL,           // Use parent's environment block
+    NULL,           // Use parent's starting directory
+    &si,            // Pointer to STARTUPINFO structure
+    &pi)            // Pointer to PROCESS_INFORMATION structure
+  )
+  {
+    _err("CreateProcess failed (%d).\n", GetLastError());
+    return -1;
+  }
+
+  // Wait until child process exits.
+  WaitForSingleObject(pi.hProcess, INFINITE);
+
+  // Get the exit code of the process
+  DWORD exitCode;
+  if (!GetExitCodeProcess(pi.hProcess, &exitCode)) {
+    _err("Failed to get process exit code");
+    res = -1;
+  } else {
+    res = (int)exitCode;
+    _err("Process has returned %d", res);
+  }
+
+  // Close process and thread handles.
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+
+  return res;
 }
 
 #else
