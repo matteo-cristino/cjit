@@ -247,4 +247,32 @@ char *win32_mkdtemp() {
     }
     return(tempDir);
 }
+void win32_rmdtemp(const char *path) {
+    static char sysTempDir[MAX_PATH];
+    static char secTempDir[MAX_PATH];
+    static char winTempDir[MAX_PATH];
+    PathCombine(sysTempDir, tempDir, "sys");
+    rm_recursive(sysTempDir);
+    if (RemoveDirectory(sysTempDir) == 0) {
+        _err("Failed to remove sys dir in temporary dir: %s",path);
+        return;
+    }
+    PathCombine(secTempDir, tempDir, "sec_api");
+    rm_recursive(secTempDir);
+    if (RemoveDirectory(secTempDir) == 0) {
+        _err("Failed to remove sec_api dir in temporary dir: %s",path);
+        return;
+    }
+    PathCombine(winTempDir, tempDir, "winapi");
+    rm_recursive(winTempDir);
+    if (RemoveDirectory(winTempDir) == 0) {
+        _err("Failed to remove winapi dir in temporary dir: %s",path);
+        return;
+    }
+    rm_recursive(path);
+    if (RemoveDirectory(path) == 0) {
+        _err("Failed to remove temporary dir: %s",path);
+        return;
+    }
+}
 #endif

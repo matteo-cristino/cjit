@@ -1233,7 +1233,11 @@ int main(int argc, char **argv) {
   free(code);
   tcc_delete(TCC);
   if(tmpdir) {
+#ifndef LIBC_MINGW32
     rm_recursive(tmpdir);
+#else
+    win32_rmdtemp(tmpdir);
+#endif
   }
   _err("---\nExecution completed");
   exit(res);
