@@ -48,4 +48,5 @@ void _err(const char *fmt, ...) {
   vfprintf(stderr, fmt, args);
   va_end(args);
   fprintf(stderr, "\n");
+  fflush(stderr);
 }
